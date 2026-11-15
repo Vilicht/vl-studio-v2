@@ -47,6 +47,7 @@ jobs:
             fi
 
             PROJ_ROOT="$(dirname "$SETTINGS")"
+            rm -rf "$PROJ_ROOT/.github"
             cp -rf "$PROJ_ROOT"/. .
             rm -rf tmp_extract "$ZIP_FILE"
 
