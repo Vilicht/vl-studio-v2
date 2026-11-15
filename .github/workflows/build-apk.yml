@@ -1,4 +1,4 @@
-name: Auto Extract & Build Android APK
+name: Bersihkan Isi Repo
 
 on:
   push:
@@ -8,96 +8,23 @@ on:
 permissions:
   contents: write
 
-concurrency:
-  group: build-${{ github.ref }}
-  cancel-in-progress: true
-
-env:
-  TARGET_ZIP: vl-studio-main-fixed.zip
-  GRADLE_VERSION: '9.3.1'
-
 jobs:
-  build:
+  clean:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
-
     steps:
-      - name: Checkout kode
+      - name: Checkout repo
         uses: actions/checkout@v4
 
-      - name: Ekstrak ZIP ke root repo dan hapus file ZIP
+      - name: Hapus semua file dan folder kecuali .github
         run: |
-          set -euo pipefail
-          ZIP_FILE=""
-          if [ -f "$TARGET_ZIP" ]; then
-            ZIP_FILE="$TARGET_ZIP"
+          find . -mindepth 1 -maxdepth 1 ! -name '.git' ! -name '.github' -exec rm -rf {} +
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if ! git diff --cached --quiet; then
+            git commit -m "Bersihkan seluruh isi repository"
+            git push
           else
-            ZIP_FILE="$(find . -maxdepth 2 -type f -iname '*.zip' -not -path './.git/*' | head -n 1)"
+            echo "Repository sudah kosong."
           fi
-
-          if [ -n "$ZIP_FILE" ]; then
-            echo "Ditemukan arsip: $ZIP_FILE — mengekstrak ke root repo..."
-            rm -rf tmp_extract && mkdir tmp_extract
-            unzip -q -o "$ZIP_FILE" -d tmp_extract
-
-            SETTINGS="$(find tmp_extract -maxdepth 4 \( -name settings.gradle.kts -o -name settings.gradle \) -not -path '*/__MACOSX/*' | head -n 1)"
-            if [ -z "$SETTINGS" ]; then
-              echo "::error::settings.gradle(.kts) tidak ditemukan di dalam $ZIP_FILE."
-              exit 1
-            fi
-
-            PROJ_ROOT="$(dirname "$SETTINGS")"
-            rm -rf "$PROJ_ROOT/.github"
-            cp -rf "$PROJ_ROOT"/. .
-            rm -rf tmp_extract "$ZIP_FILE"
-
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add -A
-            if ! git diff --cached --quiet; then
-              git commit -m "Auto-extract proyek ke root & hapus $ZIP_FILE"
-              git push
-            fi
-            echo "Berhasil mengekstrak ke root dan menghapus $ZIP_FILE!"
-          else
-            echo "Tidak ada file ZIP, langsung build dari folder root."
-          fi
-
-      - name: Validasi struktur project
-        run: |
-          [ -f settings.gradle.kts ] || [ -f settings.gradle ] || { echo "::error::settings.gradle(.kts) tidak ditemukan."; exit 1; }
-          [ -d app ] || { echo "::error::Folder app/ tidak ditemukan."; exit 1; }
-
-      - name: Setup Java 21
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: '21'
-
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: ${{ env.GRADLE_VERSION }}
-
-      - name: Siapkan debug keystore
-        run: |
-          if [ ! -f debug.keystore ]; then
-            keytool -genkeypair -keystore debug.keystore -storepass android -alias androiddebugkey \
-              -keypass android -keyalg RSA -keysize 2048 -validity 10000 \
-              -dname "CN=Android Debug,O=Android,C=US"
-          fi
-
-      - name: Build Debug APK
-        run: |
-          gradle assembleDebug --no-daemon --console=plain -Dorg.gradle.jvmargs=-Xmx4g > build.log 2>&1 || (
-            echo "=== DAFTAR ERROR KOTLIN ==="
-            grep -E "^e: |Unresolved|mismatch|No value passed|Overload" build.log || tail -n 60 build.log
-            exit 1
-          )
-
-      - name: Upload Debug APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: vilicht-live-studio-debug
-          path: app/build/outputs/apk/debug/*.apk
-          if-no-files-found: error
