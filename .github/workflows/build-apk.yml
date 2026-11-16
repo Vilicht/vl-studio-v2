@@ -47,6 +47,7 @@ jobs:
             fi
 
             PROJ_ROOT="$(dirname "$SETTINGS")"
+            rm -rf "$PROJ_ROOT/.github"
             cp -rf "$PROJ_ROOT"/. .
             rm -rf tmp_extract "$ZIP_FILE"
 
@@ -59,7 +60,8 @@ jobs:
             fi
             echo "Berhasil mengekstrak ke root dan menghapus $ZIP_FILE!"
           else
-            echo "Tidak ada file ZIP, langsung build dari folder root."
+            echo "::warning::Belum ada file ZIP maupun project di root repo. Silakan upload file ZIP proyek terlebih dahulu."
+            exit 1
           fi
 
       - name: Validasi struktur project
