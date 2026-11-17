@@ -1,52 +1,30 @@
-name: Clean Repository Files
+name: Bersihkan Isi Repo
 
 on:
+  push:
+    branches: [ "main", "master" ]
   workflow_dispatch:
-    inputs:
-      confirm_delete:
-        description: 'Ketik HAPUS untuk mengonfirmasi penghapusan semua file di branch main'
-        required: true
-        type: string
 
 permissions:
   contents: write
 
 jobs:
-  clean-repo:
-    name: Delete All Files in Repository
+  clean:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Validasi konfirmasi
-        run: |
-          if [ "${{ github.event.inputs.confirm_delete }}" != "HAPUS" ]; then
-            echo "::error::Konfirmasi tidak valid. Anda harus mengetik 'HAPUS' dengan huruf kapital."
-            exit 1
-          fi
-
-      - name: Checkout repository
+      - name: Checkout repo
         uses: actions/checkout@v4
 
-      - name: Hapus seluruh file dan folder di repository
+      - name: Hapus semua file dan folder kecuali .github
         run: |
-          set -euo pipefail
-          # Hapus semua file dan folder di root kecuali folder .git dan folder .github
           find . -mindepth 1 -maxdepth 1 ! -name '.git' ! -name '.github' -exec rm -rf {} +
-          
-          # Jika ingin menghapus folder .github juga (termasuk workflow ini), hapus tanda '#' pada baris di bawah ini:
-          # rm -rf .github
 
-      - name: Commit dan push penghapusan ke branch main
-        run: |
-          set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
           git add -A
-          if git diff --cached --quiet; then
-            echo "Repository sudah kosong, tidak ada file yang perlu dihapus."
-            exit 0
+          if ! git diff --cached --quiet; then
+            git commit -m "Bersihkan seluruh isi repository"
+            git push
+          else
+            echo "Repository sudah kosong."
           fi
-
-          git commit -m "chore: clean all repository files"
-          git push origin main
