@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Perangkat USB yang memunculkan tawaran membuka aplikasi: kelas Video (UVC). -->
+<resources>
+    <!-- Antarmuka kelas Video (0x0E): webcam UVC biasa -->
+    <usb-device class="14" />
+    <!-- Perangkat komposit dengan Interface Association Descriptor (kelas Misc 0xEF, subkelas 2) -->
+    <usb-device class="239" subclass="2" />
+</resources>
