@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 env:
   GRADLE_VERSION: '9.3.1'
@@ -20,10 +20,42 @@ jobs:
       - name: Checkout kode
         uses: actions/checkout@v4
 
-      - name: Validasi struktur project
+      - name: Siapkan project (ekstrak ZIP jika root belum ada)
         run: |
-          [ -f settings.gradle.kts ] || [ -f settings.gradle ] || { echo "::error::settings.gradle(.kts) tidak ditemukan di root repo."; exit 1; }
-          [ -d app ] || { echo "::error::Folder app/ tidak ditemukan di root repo."; exit 1; }
+          set -euo pipefail
+          if [ ! -f settings.gradle.kts ] && [ ! -f settings.gradle ]; then
+            ZIP_FILE="$(find . -maxdepth 2 -type f -iname '*.zip' -not -path './.git/*' | head -n 1)"
+            if [ -z "$ZIP_FILE" ]; then
+              echo "::error::settings.gradle(.kts) maupun file ZIP tidak ditemukan di repo."
+              exit 1
+            fi
+
+            echo "Mengekstrak $ZIP_FILE ke root repo..."
+            rm -rf tmp_extract && mkdir tmp_extract
+            unzip -q -o "$ZIP_FILE" -d tmp_extract
+
+            SETTINGS="$(find tmp_extract -maxdepth 4 \( -name settings.gradle.kts -o -name settings.gradle \) -not -path '*/__MACOSX/*' | head -n 1)"
+            if [ -z "$SETTINGS" ]; then
+              echo "::error::settings.gradle(.kts) tidak ditemukan di dalam $ZIP_FILE."
+              exit 1
+            fi
+
+            PROJ_ROOT="$(dirname "$SETTINGS")"
+            rm -rf "$PROJ_ROOT/.github"
+            cp -rf "$PROJ_ROOT"/. .
+            rm -rf tmp_extract "$ZIP_FILE"
+
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add -A
+            if ! git diff --cached --quiet; then
+              git commit -m "Extract project to root and remove $ZIP_FILE"
+              git push
+            fi
+          fi
+
+          [ -f settings.gradle.kts ] || [ -f settings.gradle ] || { echo "::error::settings.gradle(.kts) gagal disiapkan."; exit 1; }
+          [ -d app ] || { echo "::error::Folder app/ tidak ditemukan."; exit 1; }
 
       - name: Setup Java 21
         uses: actions/setup-java@v4
